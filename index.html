@@ -10,87 +10,68 @@
             background-color: #121212;
             color: #ffffff;
             margin: 0;
-            padding: 20px;
+            padding: 15px;
             display: flex;
             flex-direction: column;
             align-items: center;
         }
-        h1 {
-            color: #4CAF50;
-            font-size: 1.5rem;
-            margin-bottom: 5px;
-        }
-        .status {
-            font-size: 0.9rem;
-            color: #ff9800;
-            margin-bottom: 20px;
-        }
-        .data-panel {
-            background-color: #1e1e1e;
-            border: 1px solid #333;
-            border-radius: 8px;
-            padding: 20px;
+        h1 { color: #4CAF50; font-size: 1.4rem; margin-bottom: 5px; }
+        .status { font-size: 0.9rem; color: #ff9800; margin-bottom: 15px; text-align: center; height: 20px;}
+        
+        .input-group {
             width: 100%;
             max-width: 400px;
+            margin-bottom: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+        .input-group label { font-size: 0.9rem; color: #aaa; margin-bottom: 5px; }
+        .input-group input {
+            padding: 10px; font-size: 1rem; border-radius: 5px; border: 1px solid #444;
+            background-color: #222; color: #fff; text-align: center;
+        }
+
+        .data-panel {
+            background-color: #1e1e1e; border: 1px solid #333; border-radius: 8px;
+            padding: 15px; width: 100%; max-width: 400px; box-sizing: border-box;
             box-shadow: 0 4px 6px rgba(0,0,0,0.3);
         }
         .data-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 15px;
-            border-bottom: 1px solid #333;
-            padding-bottom: 5px;
+            display: flex; justify-content: space-between; margin-bottom: 10px;
+            border-bottom: 1px solid #333; padding-bottom: 5px; align-items: center;
         }
-        .data-label {
-            font-weight: bold;
-            color: #888;
-        }
-        .data-value {
-            font-family: monospace;
-            font-size: 1.1rem;
-            color: #4CAF50;
-        }
-        .controls {
-            margin-top: 25px;
-            display: flex;
-            gap: 10px;
-            width: 100%;
-            max-width: 400px;
-        }
-        button {
-            flex: 1;
-            padding: 15px;
-            font-size: 1rem;
-            font-weight: bold;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        #btnStart { background-color: #2196F3; color: white; }
-        #btnStart:active { background-color: #1976D2; }
-        #btnStop { background-color: #f44336; color: white; display: none; }
-        #btnStop:active { background-color: #d32f2f; }
-        #btnDownload { background-color: #ff9800; color: white; display: none; }
-        #btnDownload:active { background-color: #f57c00; }
+        .data-label { font-weight: bold; color: #888; font-size: 0.85rem; }
+        .data-value { font-family: monospace; font-size: 1rem; color: #4CAF50; text-align: right;}
+        .utm-value { color: #00bcd4; font-family: monospace; font-size: 0.95rem; text-align: right;}
         
-        .counter {
-            margin-top: 15px;
-            font-size: 0.9rem;
-            color: #aaa;
+        .controls { margin-top: 20px; display: flex; gap: 10px; width: 100%; max-width: 400px; }
+        button {
+            flex: 1; padding: 15px; font-size: 1rem; font-weight: bold; border: none;
+            border-radius: 5px; cursor: pointer; transition: background-color 0.3s;
         }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        #btnStart { background-color: #2196F3; color: white; }
+        #btnStop { background-color: #f44336; color: white; display: none; }
+        
+        .metrics {
+            margin-top: 15px; width: 100%; max-width: 400px; display: flex; justify-content: space-between;
+            color: #aaa; font-size: 0.9rem;
+        }
+        .timer { font-weight: bold; color: #fff; font-family: monospace; font-size: 1.1rem;}
     </style>
 </head>
 <body>
 
     <h1>ColectoraGps2</h1>
+    
+    <div class="input-group">
+        <label for="pointName">Nombre del Punto a Medir:</label>
+        <input type="text" id="pointName" placeholder="Ej: Vértice_1" value="Punto_1">
+    </div>
+
     <div id="statusMsg" class="status">Esperando inicialización...</div>
 
     <div class="data-panel">
-        <div class="data-row">
-            <span class="data-label">Tiempo (UTC):</span>
-            <span id="valTime" class="data-value">--:--:--.---</span>
-        </div>
         <div class="data-row">
             <span class="data-label">Latitud:</span>
             <span id="valLat" class="data-value">--.---------------</span>
@@ -100,189 +81,273 @@
             <span id="valLon" class="data-value">--.---------------</span>
         </div>
         <div class="data-row">
+            <span class="data-label">UTM Zona:</span>
+            <span id="valUtmZone" class="utm-value">--</span>
+        </div>
+        <div class="data-row">
+            <span class="data-label">UTM Este (X):</span>
+            <span id="valUtmE" class="utm-value">--------- m</span>
+        </div>
+        <div class="data-row">
+            <span class="data-label">UTM Norte (Y):</span>
+            <span id="valUtmN" class="utm-value">--------- m</span>
+        </div>
+        <div class="data-row">
             <span class="data-label">Cota (Elevación):</span>
             <span id="valAlt" class="data-value">--.------ m</span>
         </div>
         <div class="data-row">
-            <span class="data-label">Precisión (Proxy HDOP):</span>
+            <span class="data-label">Precisión HDOP:</span>
             <span id="valHdop" class="data-value">-- m</span>
         </div>
         <div class="data-row">
-            <span class="data-label">Precisión Vert. (Proxy VDOP):</span>
+            <span class="data-label">Precisión VDOP:</span>
             <span id="valVdop" class="data-value">-- m</span>
         </div>
     </div>
 
-    <div class="counter">Puntos recolectados: <span id="pointCount">0</span></div>
+    <div class="metrics">
+        <div>Épocas (Puntos): <span id="pointCount">0</span></div>
+        <div>Tiempo: <span id="timerDisplay" class="timer">00:00</span></div>
+    </div>
 
     <div class="controls">
-        <button id="btnStart" onclick="iniciarMedicion()">Iniciar Medición</button>
-        <button id="btnStop" onclick="detenerMedicion()">Detener</button>
-        <button id="btnDownload" onclick="descargarGPX()">Descargar GPX</button>
+        <button id="btnStart" onclick="iniciarMedicion()">Iniciar y Grabar</button>
+        <button id="btnStop" onclick="detenerYDescargar()">Detener y Descargar GPX</button>
     </div>
 
     <script>
+        // --- AUTO-INSTALACIÓN DE SERVICE WORKER PARA MODO OFFLINE ---
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                const swContent = `
+                    const CACHE_NAME = 'colectora-cache-v2';
+                    self.addEventListener('install', e => {
+                        e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll([location.href])));
+                    });
+                    self.addEventListener('fetch', e => {
+                        e.respondWith(caches.match(e.request).then(res => res || fetch(e.request)));
+                    });
+                `;
+                const blob = new Blob([swContent], { type: 'application/javascript' });
+                navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(err => console.log('SW Error:', err));
+            });
+        }
+
         let watchId = null;
         let gpxData = [];
         let puntoCount = 0;
+        let wakeLock = null;
+        
+        // Cronómetro
+        let timerInterval = null;
+        let startTime = 0;
 
-        // Elementos del DOM
-        const uiTime = document.getElementById('valTime');
         const uiLat = document.getElementById('valLat');
         const uiLon = document.getElementById('valLon');
+        const uiUtmZone = document.getElementById('valUtmZone');
+        const uiUtmE = document.getElementById('valUtmE');
+        const uiUtmN = document.getElementById('valUtmN');
         const uiAlt = document.getElementById('valAlt');
         const uiHdop = document.getElementById('valHdop');
         const uiVdop = document.getElementById('valVdop');
         const uiStatus = document.getElementById('statusMsg');
         const uiCount = document.getElementById('pointCount');
+        const uiTimer = document.getElementById('timerDisplay');
+        const inputName = document.getElementById('pointName');
 
-        function iniciarMedicion() {
+        // Función WGS84 a UTM (Precisión estándar)
+        function latLonToUTM(lat, lon) {
+            const a = 6378137.0;
+            const eccSquared = 0.00669438;
+            const k0 = 0.9996;
+            
+            const LongOrigin = (Math.floor((lon + 180) / 6) * 6) - 180 + 3;
+            const LongOriginRad = LongOrigin * (Math.PI / 180);
+            const LatRad = lat * (Math.PI / 180);
+            const LongRad = lon * (Math.PI / 180);
+
+            const eccPrimeSquared = (eccSquared) / (1 - eccSquared);
+            const N = a / Math.sqrt(1 - eccSquared * Math.sin(LatRad) * Math.sin(LatRad));
+            const T = Math.tan(LatRad) * Math.tan(LatRad);
+            const C = eccPrimeSquared * Math.cos(LatRad) * Math.cos(LatRad);
+            const A = Math.cos(LatRad) * (LongRad - LongOriginRad);
+
+            const M = a * ((1 - eccSquared / 4 - 3 * eccSquared * eccSquared / 64 - 5 * eccSquared * eccSquared * eccSquared / 256) * LatRad
+                - (3 * eccSquared / 8 + 3 * eccSquared * eccSquared / 32 + 45 * eccSquared * eccSquared * eccSquared / 1024) * Math.sin(2 * LatRad)
+                + (15 * eccSquared * eccSquared / 256 + 45 * eccSquared * eccSquared * eccSquared / 1024) * Math.sin(4 * LatRad)
+                - (35 * eccSquared * eccSquared * eccSquared / 3072) * Math.sin(6 * LatRad));
+
+            let UTMEasting = (k0 * N * (A + (1 - T + C) * A * A * A / 6
+                + (5 - 18 * T + T * T + 72 * C - 58 * eccPrimeSquared) * A * A * A * A * A / 120)
+                + 500000.0);
+
+            let UTMNorthing = (k0 * (M + N * Math.tan(LatRad) * (A * A / 2 + (5 - T + 9 * C + 4 * C * C) * A * A * A * A / 24
+                + (61 - 58 * T + T * T + 600 * C - 330 * eccPrimeSquared) * A * A * A * A * A * A / 720)));
+
+            if (lat < 0) UTMNorthing += 10000000.0; // Hemisferio Sur
+
+            const zoneNumber = Math.floor((lon + 180) / 6) + 1;
+            const zoneLetter = lat >= 0 ? 'N' : 'S'; // Simplificado para Norte/Sur general
+
+            return {
+                zone: `${zoneNumber} ${zoneLetter}`,
+                easting: UTMEasting.toFixed(4),
+                northing: UTMNorthing.toFixed(4)
+            };
+        }
+
+        async function solicitarWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    wakeLock.addEventListener('release', () => { console.log('Wake Lock liberado'); });
+                }
+            } catch (err) {
+                console.error('Error WakeLock:', err);
+            }
+        }
+
+        function actualizarCronometro() {
+            const now = Date.now();
+            const diff = now - startTime;
+            const minutes = Math.floor(diff / 60000);
+            const seconds = Math.floor((diff % 60000) / 1000);
+            uiTimer.innerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        async function iniciarMedicion() {
             if (!("geolocation" in navigator)) {
-                uiStatus.innerText = "Error: El navegador no soporta geolocalización.";
+                uiStatus.innerText = "Error: Geolocalización no soportada.";
+                return;
+            }
+            if (!inputName.value.trim()) {
+                alert("Por favor, introduce un nombre para el punto.");
+                inputName.focus();
                 return;
             }
 
-            // Opciones críticas para máxima precisión y mínima latencia
-            const options = {
-                enableHighAccuracy: true, 
-                maximumAge: 0,            // No usar caché, pedir posición nueva siempre
-                timeout: 10000            // Tiempo de espera para la señal
-            };
+            // Reiniciar variables para el nuevo punto
+            gpxData = [];
+            puntoCount = 0;
+            uiCount.innerText = "0";
+            uiTimer.innerText = "00:00";
+            inputName.disabled = true;
+
+            await solicitarWakeLock();
+
+            const options = { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 };
 
             uiStatus.innerText = "Buscando satélites...";
             uiStatus.style.color = "#2196F3";
             
             document.getElementById('btnStart').style.display = 'none';
             document.getElementById('btnStop').style.display = 'block';
-            document.getElementById('btnDownload').style.display = 'none';
+
+            startTime = Date.now();
+            timerInterval = setInterval(actualizarCronometro, 1000);
 
             watchId = navigator.geolocation.watchPosition(procesarPosicion, manejarError, options);
         }
 
         function procesarPosicion(position) {
-            uiStatus.innerText = "Midiendo en tiempo real (GPS activo)";
+            uiStatus.innerText = "Midiendo y grabando (GPS Activo)";
             uiStatus.style.color = "#4CAF50";
 
             const coords = position.coords;
-            const timestamp = position.timestamp;
-            const dateObj = new Date(timestamp);
-            
-            // Extracción de datos con máxima cantidad de decimales nativos (IEEE 754)
             const lat = coords.latitude;
             const lon = coords.longitude;
             const alt = coords.altitude !== null ? coords.altitude : 0.0;
-            
-            // En API Web, accuracy es en metros. Usado como equivalente a HDOP/VDOP en formato GPX.
             const hdopProxy = coords.accuracy !== null ? coords.accuracy : 0.0;
             const vdopProxy = coords.altitudeAccuracy !== null ? coords.altitudeAccuracy : 0.0;
-
-            // Formateo de tiempo UTC en formato ISO 8601 (Requerido por GPX)
-            const isoTime = dateObj.toISOString();
+            const isoTime = new Date(position.timestamp).toISOString();
             
-            // Actualizar interfaz gráfica
-            uiTime.innerText = dateObj.toISOString().split('T')[1].replace('Z', '');
+            // Cálculos UTM
+            const utm = latLonToUTM(lat, lon);
+
+            // UI
             uiLat.innerText = lat.toString();
             uiLon.innerText = lon.toString();
+            uiUtmZone.innerText = utm.zone;
+            uiUtmE.innerText = utm.easting;
+            uiUtmN.innerText = utm.northing;
             uiAlt.innerText = alt.toString() + " m";
             uiHdop.innerText = hdopProxy.toString() + " m";
             uiVdop.innerText = vdopProxy.toString() + " m";
 
-            // Guardar punto para el archivo GPX
-            gpxData.push({
-                lat: lat,
-                lon: lon,
-                ele: alt,
-                time: isoTime,
-                hdop: hdopProxy,
-                vdop: vdopProxy
-            });
-
+            // Guardar Data
+            gpxData.push({ lat, lon, ele: alt, time: isoTime, hdop: hdopProxy, vdop: vdopProxy });
             puntoCount++;
             uiCount.innerText = puntoCount;
         }
 
         function manejarError(error) {
-            let msg = "Error de GPS: ";
+            let msg = "Error: ";
             switch(error.code) {
-                case error.PERMISSION_DENIED:
-                    msg += "Permiso denegado.";
-                    break;
-                case error.POSITION_UNAVAILABLE:
-                    msg += "Señal no disponible.";
-                    break;
-                case error.TIMEOUT:
-                    msg += "Tiempo de espera agotado.";
-                    break;
-                default:
-                    msg += "Error desconocido.";
-                    break;
+                case error.PERMISSION_DENIED: msg += "Permiso denegado."; break;
+                case error.POSITION_UNAVAILABLE: msg += "Señal GPS perdida."; break;
+                case error.TIMEOUT: msg += "Timeout."; break;
             }
             uiStatus.innerText = msg;
             uiStatus.style.color = "#f44336";
         }
 
-        function detenerMedicion() {
-            if (watchId !== null) {
-                navigator.geolocation.clearWatch(watchId);
-                watchId = null;
-            }
+        function detenerYDescargar() {
+            // Detener procesos
+            if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+            if (timerInterval !== null) { clearInterval(timerInterval); timerInterval = null; }
+            if (wakeLock !== null) { wakeLock.release(); wakeLock = null; }
             
-            uiStatus.innerText = "Medición detenida. Listo para exportar.";
-            uiStatus.style.color = "#ff9800";
-            
+            inputName.disabled = false;
             document.getElementById('btnStart').style.display = 'block';
-            document.getElementById('btnStart').innerText = 'Continuar Medición';
+            document.getElementById('btnStart').innerText = 'Iniciar Nuevo Punto';
             document.getElementById('btnStop').style.display = 'none';
-            
-            if (gpxData.length > 0) {
-                document.getElementById('btnDownload').style.display = 'block';
+            uiStatus.innerText = "Medición finalizada. Descargando GPX...";
+
+            if (gpxData.length === 0) {
+                alert("No se capturaron coordenadas para este punto.");
+                return;
             }
-        }
 
-        function descargarGPX() {
-            if (gpxData.length === 0) return;
-
-            // Construcción robusta del archivo XML/GPX
+            // Generar GPX
+            const nombrePunto = inputName.value.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+            
             let gpxContent = `<?xml version="1.0" encoding="UTF-8"?>\n`;
-            gpxContent += `<gpx version="1.1" creator="ColectoraGps2" xmlns="http://www.topografix.com/GPX/1/1">\n`;
+            gpxContent += `<gpx version="1.1" creator="ColectoraGps2 - Ing. Jaime Ulises Paz Lopez" xmlns="http://www.topografix.com/GPX/1/1">\n`;
             gpxContent += `  <metadata>\n`;
-            gpxContent += `    <name>Levantamiento Diferencial</name>\n`;
+            gpxContent += `    <name>${nombrePunto}</name>\n`;
             gpxContent += `    <time>${gpxData[0].time}</time>\n`;
             gpxContent += `  </metadata>\n`;
             gpxContent += `  <trk>\n`;
-            gpxContent += `    <name>Track_Colectora</name>\n`;
+            gpxContent += `    <name>${nombrePunto}_Track</name>\n`;
             gpxContent += `    <trkseg>\n`;
 
             gpxData.forEach(pt => {
                 gpxContent += `      <trkpt lat="${pt.lat}" lon="${pt.lon}">\n`;
                 gpxContent += `        <ele>${pt.ele}</ele>\n`;
                 gpxContent += `        <time>${pt.time}</time>\n`;
-                // Se registra el proxy de dilución en metros para procesadores post-vuelo
                 if(pt.hdop) gpxContent += `        <hdop>${pt.hdop}</hdop>\n`;
                 if(pt.vdop) gpxContent += `        <vdop>${pt.vdop}</vdop>\n`;
                 gpxContent += `      </trkpt>\n`;
             });
 
-            gpxContent += `    </trkseg>\n`;
-            gpxContent += `  </trk>\n`;
-            gpxContent += `</gpx>`;
+            gpxContent += `    </trkseg>\n  </trk>\n</gpx>`;
 
-            // Crear el archivo Blob y forzar la descarga
+            // Forzar Descarga
             const blob = new Blob([gpxContent], { type: 'application/gpx+xml' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             
-            // Generar nombre de archivo con fecha y hora actual
-            const dateStr = new Date().toISOString().replace(/[:.]/g, '-').split('T');
-            a.download = `ColectoraGps2_${dateStr[0]}_${dateStr[1]}.gpx`;
+            const timeTag = new Date().toISOString().split('T')[1].replace(/:/g, '').split('.')[0];
+            a.download = `${nombrePunto}_${timeTag}.gpx`;
             
             a.href = url;
             document.body.appendChild(a);
             a.click();
-            setTimeout(() => {
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-            }, 0);
+            setTimeout(() => { document.body.removeChild(a); window.URL.revokeObjectURL(url); }, 0);
+            
+            uiStatus.innerText = `Archivo ${a.download} guardado. Listo para el siguiente.`;
+            uiStatus.style.color = "#4CAF50";
         }
     </script>
 </body>
