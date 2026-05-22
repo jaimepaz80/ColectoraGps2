@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ColectoraGps2 - Registro Diferencial</title>
+    <title>ColectoraGps2 - Exigencia por Segundo</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -62,11 +62,11 @@
 </head>
 <body>
 
-    <h1>ColectoraGps2</h1>
+    <h1>ColectoraGps2 (Modo PPK Forzado)</h1>
     
     <div class="input-group">
         <label for="pointName">Nombre del Punto a Medir:</label>
-        <input type="text" id="pointName" placeholder="Ej: Vértice_1" value="Punto_1">
+        <input type="text" id="pointName" placeholder="Ej: Vertice_PPK" value="Punto_1">
     </div>
 
     <div id="statusMsg" class="status">Esperando inicialización...</div>
@@ -101,8 +101,8 @@
             <span id="valHdop" class="data-value">-- m</span>
         </div>
         <div class="data-row">
-            <span class="data-label">Precisión VDOP:</span>
-            <span id="valVdop" class="data-value">-- m</span>
+            <span class="data-label">Intervalo de Petición:</span>
+            <span class="data-value" style="color:#ffeb3b;">1000 ms</span>
         </div>
     </div>
 
@@ -117,11 +117,10 @@
     </div>
 
     <script>
-        // --- AUTO-INSTALACIÓN DE SERVICE WORKER PARA MODO OFFLINE ---
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 const swContent = `
-                    const CACHE_NAME = 'colectora-cache-v2';
+                    const CACHE_NAME = 'colectora-cache-v3';
                     self.addEventListener('install', e => {
                         e.waitUntil(caches.open(CACHE_NAME).then(c => c.addAll([location.href])));
                     });
@@ -134,12 +133,10 @@
             });
         }
 
-        let watchId = null;
+        let pollingIntervalId = null;
         let gpxData = [];
         let puntoCount = 0;
         let wakeLock = null;
-        
-        // Cronómetro
         let timerInterval = null;
         let startTime = 0;
 
@@ -150,13 +147,11 @@
         const uiUtmN = document.getElementById('valUtmN');
         const uiAlt = document.getElementById('valAlt');
         const uiHdop = document.getElementById('valHdop');
-        const uiVdop = document.getElementById('valVdop');
         const uiStatus = document.getElementById('statusMsg');
         const uiCount = document.getElementById('pointCount');
         const uiTimer = document.getElementById('timerDisplay');
         const inputName = document.getElementById('pointName');
 
-        // Función WGS84 a UTM (Precisión estándar)
         function latLonToUTM(lat, lon) {
             const a = 6378137.0;
             const eccSquared = 0.00669438;
@@ -185,10 +180,10 @@
             let UTMNorthing = (k0 * (M + N * Math.tan(LatRad) * (A * A / 2 + (5 - T + 9 * C + 4 * C * C) * A * A * A * A / 24
                 + (61 - 58 * T + T * T + 600 * C - 330 * eccPrimeSquared) * A * A * A * A * A * A / 720)));
 
-            if (lat < 0) UTMNorthing += 10000000.0; // Hemisferio Sur
+            if (lat < 0) UTMNorthing += 10000000.0;
 
             const zoneNumber = Math.floor((lon + 180) / 6) + 1;
-            const zoneLetter = lat >= 0 ? 'N' : 'S'; // Simplificado para Norte/Sur general
+            const zoneLetter = lat >= 0 ? 'N' : 'S';
 
             return {
                 zone: `${zoneNumber} ${zoneLetter}`,
@@ -201,7 +196,6 @@
             try {
                 if ('wakeLock' in navigator) {
                     wakeLock = await navigator.wakeLock.request('screen');
-                    wakeLock.addEventListener('release', () => { console.log('Wake Lock liberado'); });
                 }
             } catch (err) {
                 console.error('Error WakeLock:', err);
@@ -216,6 +210,12 @@
             uiTimer.innerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
         }
 
+        function solicitarCoordenadaForzada() {
+            // Se exige una coordenada nueva, ignorando caché (maximumAge: 0)
+            const options = { enableHighAccuracy: true, maximumAge: 0, timeout: 950 };
+            navigator.geolocation.getCurrentPosition(procesarPosicion, manejarError, options);
+        }
+
         async function iniciarMedicion() {
             if (!("geolocation" in navigator)) {
                 uiStatus.innerText = "Error: Geolocalización no soportada.";
@@ -227,7 +227,6 @@
                 return;
             }
 
-            // Reiniciar variables para el nuevo punto
             gpxData = [];
             puntoCount = 0;
             uiCount.innerText = "0";
@@ -236,9 +235,7 @@
 
             await solicitarWakeLock();
 
-            const options = { enableHighAccuracy: true, maximumAge: 0, timeout: 10000 };
-
-            uiStatus.innerText = "Buscando satélites...";
+            uiStatus.innerText = "Forzando lecturas (Intervalo 1s)...";
             uiStatus.style.color = "#2196F3";
             
             document.getElementById('btnStart').style.display = 'none';
@@ -247,11 +244,13 @@
             startTime = Date.now();
             timerInterval = setInterval(actualizarCronometro, 1000);
 
-            watchId = navigator.geolocation.watchPosition(procesarPosicion, manejarError, options);
+            // Iniciar ciclo forzado cada 1000 milisegundos
+            solicitarCoordenadaForzada(); // Disparo inmediato
+            pollingIntervalId = setInterval(solicitarCoordenadaForzada, 1000); // Disparos subsecuentes
         }
 
         function procesarPosicion(position) {
-            uiStatus.innerText = "Midiendo y grabando (GPS Activo)";
+            uiStatus.innerText = "Extrayendo épocas forzadas";
             uiStatus.style.color = "#4CAF50";
 
             const coords = position.coords;
@@ -260,12 +259,12 @@
             const alt = coords.altitude !== null ? coords.altitude : 0.0;
             const hdopProxy = coords.accuracy !== null ? coords.accuracy : 0.0;
             const vdopProxy = coords.altitudeAccuracy !== null ? coords.altitudeAccuracy : 0.0;
+            
+            // Marca de tiempo registrada por el sensor
             const isoTime = new Date(position.timestamp).toISOString();
             
-            // Cálculos UTM
             const utm = latLonToUTM(lat, lon);
 
-            // UI
             uiLat.innerText = lat.toString();
             uiLon.innerText = lon.toString();
             uiUtmZone.innerText = utm.zone;
@@ -273,28 +272,19 @@
             uiUtmN.innerText = utm.northing;
             uiAlt.innerText = alt.toString() + " m";
             uiHdop.innerText = hdopProxy.toString() + " m";
-            uiVdop.innerText = vdopProxy.toString() + " m";
 
-            // Guardar Data
             gpxData.push({ lat, lon, ele: alt, time: isoTime, hdop: hdopProxy, vdop: vdopProxy });
             puntoCount++;
             uiCount.innerText = puntoCount;
         }
 
         function manejarError(error) {
-            let msg = "Error: ";
-            switch(error.code) {
-                case error.PERMISSION_DENIED: msg += "Permiso denegado."; break;
-                case error.POSITION_UNAVAILABLE: msg += "Señal GPS perdida."; break;
-                case error.TIMEOUT: msg += "Timeout."; break;
-            }
-            uiStatus.innerText = msg;
-            uiStatus.style.color = "#f44336";
+            // Solo logeamos errores menores para no detener el ciclo forzado si una petición hace timeout
+            console.warn("Petición saltada o demorada:", error.message);
         }
 
         function detenerYDescargar() {
-            // Detener procesos
-            if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+            if (pollingIntervalId !== null) { clearInterval(pollingIntervalId); pollingIntervalId = null; }
             if (timerInterval !== null) { clearInterval(timerInterval); timerInterval = null; }
             if (wakeLock !== null) { wakeLock.release(); wakeLock = null; }
             
@@ -302,14 +292,14 @@
             document.getElementById('btnStart').style.display = 'block';
             document.getElementById('btnStart').innerText = 'Iniciar Nuevo Punto';
             document.getElementById('btnStop').style.display = 'none';
-            uiStatus.innerText = "Medición finalizada. Descargando GPX...";
+            uiStatus.innerText = "Ciclo forzado detenido. Generando GPX...";
 
             if (gpxData.length === 0) {
                 alert("No se capturaron coordenadas para este punto.");
+                uiStatus.innerText = "Esperando inicialización...";
                 return;
             }
 
-            // Generar GPX
             const nombrePunto = inputName.value.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
             
             let gpxContent = `<?xml version="1.0" encoding="UTF-8"?>\n`;
@@ -333,7 +323,6 @@
 
             gpxContent += `    </trkseg>\n  </trk>\n</gpx>`;
 
-            // Forzar Descarga
             const blob = new Blob([gpxContent], { type: 'application/gpx+xml' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
@@ -346,7 +335,7 @@
             a.click();
             setTimeout(() => { document.body.removeChild(a); window.URL.revokeObjectURL(url); }, 0);
             
-            uiStatus.innerText = `Archivo ${a.download} guardado. Listo para el siguiente.`;
+            uiStatus.innerText = `Archivo ${a.download} guardado.`;
             uiStatus.style.color = "#4CAF50";
         }
     </script>
