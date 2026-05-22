@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ColectoraGps2 - Registro Diferencial</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #121212;
+            color: #ffffff;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        h1 {
+            color: #4CAF50;
+            font-size: 1.5rem;
+            margin-bottom: 5px;
+        }
+        .status {
+            font-size: 0.9rem;
+            color: #ff9800;
+            margin-bottom: 20px;
+        }
+        .data-panel {
+            background-color: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 8px;
+            padding: 20px;
+            width: 100%;
+            max-width: 400px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+        }
+        .data-label {
+            font-weight: bold;
+            color: #888;
+        }
+        .data-value {
+            font-family: monospace;
+            font-size: 1.1rem;
+            color: #4CAF50;
+        }
+        .controls {
+            margin-top: 25px;
+            display: flex;
+            gap: 10px;
+            width: 100%;
+            max-width: 400px;
+        }
+        button {
+            flex: 1;
+            padding: 15px;
+            font-size: 1rem;
+            font-weight: bold;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        #btnStart { background-color: #2196F3; color: white; }
+        #btnStart:active { background-color: #1976D2; }
+        #btnStop { background-color: #f44336; color: white; display: none; }
+        #btnStop:active { background-color: #d32f2f; }
+        #btnDownload { background-color: #ff9800; color: white; display: none; }
+        #btnDownload:active { background-color: #f57c00; }
+        
+        .counter {
+            margin-top: 15px;
+            font-size: 0.9rem;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>ColectoraGps2</h1>
+    <div id="statusMsg" class="status">Esperando inicialización...</div>
+
+    <div class="data-panel">
+        <div class="data-row">
+            <span class="data-label">Tiempo (UTC):</span>
+            <span id="valTime" class="data-value">--:--:--.---</span>
+        </div>
+        <div class="data-row">
+            <span class="data-label">Latitud:</span>
+            <span id="valLat" class="data-value">--.---------------</span>
+        </div>
+        <div class="data-row">
+            <span class="data-label">Longitud:</span>
+            <span id="valLon" class="data-value">--.---------------</span>
+        </div>
+        <div class="data-row">
+            <span class="data-label">Cota (Elevación):</span>
+            <span id="valAlt" class="data-value">--.------ m</span>
+        </div>
+        <div class="data-row">
+            <span class="data-label">Precisión (Proxy HDOP):</span>
+            <span id="valHdop" class="data-value">-- m</span>
+        </div>
+        <div class="data-row">
+            <span class="data-label">Precisión Vert. (Proxy VDOP):</span>
+            <span id="valVdop" class="data-value">-- m</span>
+        </div>
+    </div>
+
+    <div class="counter">Puntos recolectados: <span id="pointCount">0</span></div>
+
+    <div class="controls">
+        <button id="btnStart" onclick="iniciarMedicion()">Iniciar Medición</button>
+        <button id="btnStop" onclick="detenerMedicion()">Detener</button>
+        <button id="btnDownload" onclick="descargarGPX()">Descargar GPX</button>
+    </div>
+
+    <script>
+        let watchId = null;
+        let gpxData = [];
+        let puntoCount = 0;
+
+        // Elementos del DOM
+        const uiTime = document.getElementById('valTime');
+        const uiLat = document.getElementById('valLat');
+        const uiLon = document.getElementById('valLon');
+        const uiAlt = document.getElementById('valAlt');
+        const uiHdop = document.getElementById('valHdop');
+        const uiVdop = document.getElementById('valVdop');
+        const uiStatus = document.getElementById('statusMsg');
+        const uiCount = document.getElementById('pointCount');
+
+        function iniciarMedicion() {
+            if (!("geolocation" in navigator)) {
+                uiStatus.innerText = "Error: El navegador no soporta geolocalización.";
+                return;
+            }
+
+            // Opciones críticas para máxima precisión y mínima latencia
+            const options = {
+                enableHighAccuracy: true, 
+                maximumAge: 0,            // No usar caché, pedir posición nueva siempre
+                timeout: 10000            // Tiempo de espera para la señal
+            };
+
+            uiStatus.innerText = "Buscando satélites...";
+            uiStatus.style.color = "#2196F3";
+            
+            document.getElementById('btnStart').style.display = 'none';
+            document.getElementById('btnStop').style.display = 'block';
+            document.getElementById('btnDownload').style.display = 'none';
+
+            watchId = navigator.geolocation.watchPosition(procesarPosicion, manejarError, options);
+        }
+
+        function procesarPosicion(position) {
+            uiStatus.innerText = "Midiendo en tiempo real (GPS activo)";
+            uiStatus.style.color = "#4CAF50";
+
+            const coords = position.coords;
+            const timestamp = position.timestamp;
+            const dateObj = new Date(timestamp);
+            
+            // Extracción de datos con máxima cantidad de decimales nativos (IEEE 754)
+            const lat = coords.latitude;
+            const lon = coords.longitude;
+            const alt = coords.altitude !== null ? coords.altitude : 0.0;
+            
+            // En API Web, accuracy es en metros. Usado como equivalente a HDOP/VDOP en formato GPX.
+            const hdopProxy = coords.accuracy !== null ? coords.accuracy : 0.0;
+            const vdopProxy = coords.altitudeAccuracy !== null ? coords.altitudeAccuracy : 0.0;
+
+            // Formateo de tiempo UTC en formato ISO 8601 (Requerido por GPX)
+            const isoTime = dateObj.toISOString();
+            
+            // Actualizar interfaz gráfica
+            uiTime.innerText = dateObj.toISOString().split('T')[1].replace('Z', '');
+            uiLat.innerText = lat.toString();
+            uiLon.innerText = lon.toString();
+            uiAlt.innerText = alt.toString() + " m";
+            uiHdop.innerText = hdopProxy.toString() + " m";
+            uiVdop.innerText = vdopProxy.toString() + " m";
+
+            // Guardar punto para el archivo GPX
+            gpxData.push({
+                lat: lat,
+                lon: lon,
+                ele: alt,
+                time: isoTime,
+                hdop: hdopProxy,
+                vdop: vdopProxy
+            });
+
+            puntoCount++;
+            uiCount.innerText = puntoCount;
+        }
+
+        function manejarError(error) {
+            let msg = "Error de GPS: ";
+            switch(error.code) {
+                case error.PERMISSION_DENIED:
+                    msg += "Permiso denegado.";
+                    break;
+                case error.POSITION_UNAVAILABLE:
+                    msg += "Señal no disponible.";
+                    break;
+                case error.TIMEOUT:
+                    msg += "Tiempo de espera agotado.";
+                    break;
+                default:
+                    msg += "Error desconocido.";
+                    break;
+            }
+            uiStatus.innerText = msg;
+            uiStatus.style.color = "#f44336";
+        }
+
+        function detenerMedicion() {
+            if (watchId !== null) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+            
+            uiStatus.innerText = "Medición detenida. Listo para exportar.";
+            uiStatus.style.color = "#ff9800";
+            
+            document.getElementById('btnStart').style.display = 'block';
+            document.getElementById('btnStart').innerText = 'Continuar Medición';
+            document.getElementById('btnStop').style.display = 'none';
+            
+            if (gpxData.length > 0) {
+                document.getElementById('btnDownload').style.display = 'block';
+            }
+        }
+
+        function descargarGPX() {
+            if (gpxData.length === 0) return;
+
+            // Construcción robusta del archivo XML/GPX
+            let gpxContent = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+            gpxContent += `<gpx version="1.1" creator="ColectoraGps2" xmlns="http://www.topografix.com/GPX/1/1">\n`;
+            gpxContent += `  <metadata>\n`;
+            gpxContent += `    <name>Levantamiento Diferencial</name>\n`;
+            gpxContent += `    <time>${gpxData[0].time}</time>\n`;
+            gpxContent += `  </metadata>\n`;
+            gpxContent += `  <trk>\n`;
+            gpxContent += `    <name>Track_Colectora</name>\n`;
+            gpxContent += `    <trkseg>\n`;
+
+            gpxData.forEach(pt => {
+                gpxContent += `      <trkpt lat="${pt.lat}" lon="${pt.lon}">\n`;
+                gpxContent += `        <ele>${pt.ele}</ele>\n`;
+                gpxContent += `        <time>${pt.time}</time>\n`;
+                // Se registra el proxy de dilución en metros para procesadores post-vuelo
+                if(pt.hdop) gpxContent += `        <hdop>${pt.hdop}</hdop>\n`;
+                if(pt.vdop) gpxContent += `        <vdop>${pt.vdop}</vdop>\n`;
+                gpxContent += `      </trkpt>\n`;
+            });
+
+            gpxContent += `    </trkseg>\n`;
+            gpxContent += `  </trk>\n`;
+            gpxContent += `</gpx>`;
+
+            // Crear el archivo Blob y forzar la descarga
+            const blob = new Blob([gpxContent], { type: 'application/gpx+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            
+            // Generar nombre de archivo con fecha y hora actual
+            const dateStr = new Date().toISOString().replace(/[:.]/g, '-').split('T');
+            a.download = `ColectoraGps2_${dateStr[0]}_${dateStr[1]}.gpx`;
+            
+            a.href = url;
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 0);
+        }
+    </script>
+</body>
+</html>
